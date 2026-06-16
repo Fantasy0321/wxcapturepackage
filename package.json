@@ -1,0 +1,24 @@
+{
+  "name": "WMPFDebugger",
+  "version": "1.0.0",
+  "main": "src/desktop/bootstrap.js",
+  "license": "MIT",
+  "author": "evi0s",
+  "scripts": {
+    "start": "npx ts-node src/index.ts",
+    "start:desktop": "npx electron .",
+    "dev:desktop": "cross-env NODE_ENV=development npx electron ."
+  },
+  "dependencies": {
+    "frida": "^17.13.0",
+    "protobufjs": "^8.6.3",
+    "ws": "^8.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.3",
+    "@types/ws": "^8.18.1",
+    "electron": "^42.4.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3"
+  }
+}

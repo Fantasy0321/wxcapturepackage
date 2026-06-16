@@ -1,0 +1,8 @@
+{
+    "Version": 25046,
+    "LoadStartHookOffset": "0x29E8380",
+    "CDPFilterHookOffset": "0x384E490",
+    "ResourceCachePolicyHookOffset": "0x2A67E10",
+    "SceneOffsets": [64, 640],
+    "EnableSceneFallback": false
+}

@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WMPF Debugger</title>
+<style>
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #1a1b2e;
+  --surface: #222340;
+  --surface-hover: #2a2b50;
+  --text: #e0e0f0;
+  --text-dim: #8888aa;
+  --green: #4ade80;
+  --red: #f87171;
+  --yellow: #fbbf24;
+  --accent: #818cf8;
+  --border: #2e2f52;
+}
+
+body {
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  padding: 14px 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+header h1 {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.badge {
+  font-size: 11px;
+  padding: 2px 10px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 500;
+}
+
+.dashboard {
+  display: flex;
+  gap: 10px;
+  padding: 12px 24px;
+  flex-shrink: 0;
+}
+
+.card {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  min-width: 0;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 6px;
+}
+
+.indicator {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background 0.3s;
+}
+
+.indicator.off { background: #555; }
+.indicator.on { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.indicator.error { background: var(--red); box-shadow: 0 0 6px var(--red); }
+
+.card-title { font-size: 12px; font-weight: 600; }
+.card-desc { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+.card-desc code {
+  background: rgba(129, 140, 248, 0.15);
+  color: var(--accent);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: 'Consolas', 'Cascadia Code', monospace;
+  font-size: 11px;
+}
+
+.config-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 24px 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.config-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.config-group label {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.config-group input {
+  width: 68px;
+  background: #12132a;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  padding: 4px 8px;
+  font-size: 12px;
+  font-family: 'Consolas', monospace;
+  outline: none;
+  transition: border 0.15s;
+}
+
+.config-group input:focus {
+  border-color: var(--accent);
+}
+
+.btn {
+  background: var(--accent);
+  border: none;
+  color: #fff;
+  padding: 5px 14px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: 0.15s;
+}
+
+.btn:hover { opacity: 0.85; }
+.btn:active { opacity: 0.7; }
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+.btn-outline:hover { background: var(--surface-hover); color: var(--text); }
+.btn-copy {
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  padding: 3px 10px;
+  font-size: 11px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: 0.15s;
+}
+.btn-copy:hover { background: var(--accent); color: #fff; }
+.btn-copy.copied { background: var(--green); border-color: var(--green); color: #fff; }
+
+.url-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 24px 10px;
+  flex-shrink: 0;
+}
+
+.url-bar code {
+  flex: 1;
+  background: #12132a;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 6px 12px;
+  font-family: 'Consolas', monospace;
+  font-size: 12px;
+  color: var(--accent);
+  user-select: all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-section {
+  flex: 1;
+  padding: 0 24px 14px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  flex-shrink: 0;
+}
+
+.log-header h2 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+#clearLog {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 2px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: 0.15s;
+}
+
+#clearLog:hover { background: var(--surface-hover); color: var(--text); }
+
+.log-container {
+  flex: 1;
+  background: #12132a;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  overflow-y: auto;
+  font-family: 'Consolas', 'Cascadia Code', monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  min-height: 0;
+}
+
+.log-container::-webkit-scrollbar { width: 5px; }
+.log-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+.log-line { white-space: pre-wrap; word-break: break-all; }
+.log-line .time { color: #555577; margin-right: 6px; }
+.log-line .level-info { color: var(--text); }
+.log-line .level-error { color: var(--red); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>WMPF Debugger</h1>
+  <span class="badge">Desktop</span>
+</header>
+
+<div class="dashboard">
+  <div class="card">
+    <div class="card-header">
+      <span class="indicator off" id="indicator-debug"></span>
+      <span class="card-title">Debug Server</span>
+    </div>
+    <div class="card-desc" id="desc-debug">接收小程序调试消息</div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <span class="indicator off" id="indicator-cdp"></span>
+      <span class="card-title">CDP Proxy</span>
+    </div>
+    <div class="card-desc" id="desc-cdp">转发 CDP 协议到 DevTools</div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <span class="indicator off" id="indicator-frida"></span>
+      <span class="card-title">Frida</span>
+    </div>
+    <div class="card-desc" id="desc-frida">注入 Hook 到 WMPF 进程</div>
+  </div>
+</div>
+
+<div class="config-row">
+  <div class="config-group">
+    <label>Debug 端口:</label>
+    <input type="number" id="inputDebugPort" value="9421" min="1024" max="65535">
+  </div>
+  <div class="config-group">
+    <label>CDP 端口:</label>
+    <input type="number" id="inputCdpPort" value="62000" min="1024" max="65535">
+  </div>
+  <button class="btn" id="btnApply">应用并重启</button>
+</div>
+
+<div class="url-bar">
+  <code id="urlDisplay">devtools://devtools/bundled/inspector.html?ws=127.0.0.1:62000</code>
+  <button class="btn-copy" id="btnCopy">复制</button>
+</div>
+
+<div class="log-section">
+  <div class="log-header">
+    <h2>日志输出</h2>
+    <button id="clearLog">清空</button>
+  </div>
+  <div class="log-container" id="logContainer"></div>
+</div>
+
+<script>
+const logContainer = document.getElementById('logContainer');
+const inputDebugPort = document.getElementById('inputDebugPort');
+const inputCdpPort = document.getElementById('inputCdpPort');
+const urlDisplay = document.getElementById('urlDisplay');
+const btnCopy = document.getElementById('btnCopy');
+const btnApply = document.getElementById('btnApply');
+
+const indicators = {
+  debug: { el: document.getElementById('indicator-debug'), desc: document.getElementById('desc-debug') },
+  cdp: { el: document.getElementById('indicator-cdp'), desc: document.getElementById('desc-cdp') },
+  frida: { el: document.getElementById('indicator-frida'), desc: document.getElementById('desc-frida') },
+};
+
+function updateUrl(cdpPort) {
+  urlDisplay.textContent = `devtools://devtools/bundled/inspector.html?ws=127.0.0.1:${cdpPort}`;
+}
+
+function setIndicator(name, on, errorMsg) {
+  const { el, desc } = indicators[name];
+  el.className = 'indicator off';
+  if (on) {
+    el.className = 'indicator on';
+    desc.textContent = name === 'frida' ? '已注入 Hook' : '运行中';
+  } else if (errorMsg) {
+    el.className = 'indicator error';
+    desc.textContent = name === 'frida' ? `失败: ${errorMsg}` : '未运行';
+  } else {
+    desc.textContent = name === 'frida' ? '未连接' : '未运行';
+  }
+}
+
+function updateIndicators(state) {
+  setIndicator('debug', state.debugServer);
+  setIndicator('cdp', state.cdpProxy);
+  setIndicator('frida', state.frida, state.fridaError || undefined);
+}
+
+function addLog(message) {
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  const time = new Date().toLocaleTimeString();
+  const isError = message.startsWith('[error]');
+  const level = isError ? 'level-error' : 'level-info';
+  line.innerHTML = `<span class="time">${time}</span><span class="${level}">${escapeHtml(message)}</span>`;
+  logContainer.appendChild(line);
+  logContainer.scrollTop = logContainer.scrollHeight;
+}
+
+function escapeHtml(text) {
+  const d = document.createElement('div');
+  d.textContent = text;
+  return d.innerHTML;
+}
+
+// Copy button
+btnCopy.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(urlDisplay.textContent);
+    btnCopy.textContent = '已复制';
+    btnCopy.classList.add('copied');
+    setTimeout(() => {
+      btnCopy.textContent = '复制';
+      btnCopy.classList.remove('copied');
+    }, 2000);
+  } catch {
+    // fallback
+    const range = document.createRange();
+    range.selectNodeContents(urlDisplay);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    document.execCommand('copy');
+    sel.removeAllRanges();
+    btnCopy.textContent = '已复制';
+    setTimeout(() => { btnCopy.textContent = '复制'; }, 2000);
+  }
+});
+
+// Apply & restart
+btnApply.addEventListener('click', async () => {
+  const debugPort = parseInt(inputDebugPort.value) || 9421;
+  const cdpPort = parseInt(inputCdpPort.value) || 62000;
+  if (debugPort < 1024 || debugPort > 65535 || cdpPort < 1024 || cdpPort > 65535) {
+    addLog('[error] 端口范围: 1024-65535');
+    return;
+  }
+  updateUrl(cdpPort);
+  btnApply.textContent = '重启中...';
+  btnApply.disabled = true;
+  try {
+    const state = await window.electronAPI.restartServers(debugPort, cdpPort);
+    updateIndicators(state);
+  } catch (e) {
+    addLog(`[error] 重启失败: ${e.message}`);
+  }
+  btnApply.textContent = '应用并重启';
+  btnApply.disabled = false;
+});
+
+// Clear log
+document.getElementById('clearLog').addEventListener('click', () => {
+  logContainer.innerHTML = '';
+});
+
+// Electron IPC
+window.electronAPI.onLog((msg) => addLog(msg));
+window.electronAPI.onState((state) => {
+  if (state) {
+    updateIndicators(state);
+    // sync port inputs from URL if available
+  }
+});
+
+// Get initial state + ports
+window.electronAPI.getState().then((state) => {
+  if (state) updateIndicators(state);
+});
+window.electronAPI.getPorts().then((ports) => {
+  if (ports) {
+    inputDebugPort.value = ports.debugPort;
+    inputCdpPort.value = ports.cdpPort;
+    updateUrl(ports.cdpPort);
+  }
+});
+</script>
+</body>
+</html>
