@@ -7,18 +7,56 @@
   "scripts": {
     "start": "npx ts-node src/index.ts",
     "start:desktop": "npx electron .",
-    "dev:desktop": "cross-env NODE_ENV=development npx electron ."
+    "dev:desktop": "cross-env NODE_ENV=development npx electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "com.evi0s.wmpf-debugger",
+    "productName": "WMPF Debugger",
+    "directories": {
+      "output": "release"
+    },
+    "electronDist": "node_modules/electron/dist",
+    "files": [
+      "src/**/*",
+      "frida/**/*",
+      "tsconfig.json",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/frida/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "WMPF Debugger"
+    }
   },
   "dependencies": {
     "frida": "^17.13.0",
     "protobufjs": "^8.6.3",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3",
     "ws": "^8.21.0"
   },
   "devDependencies": {
     "@types/node": "^25.9.3",
     "@types/ws": "^8.18.1",
     "electron": "^42.4.0",
-    "ts-node": "^10.9.2",
-    "typescript": "^6.0.3"
+    "electron-builder": "^26.15.3"
   }
 }
