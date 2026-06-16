@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Build Windows release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+
+      - name: Install Yarn
+        run: npm install -g yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build installer
+        run: yarn dist
+
+      - name: Package unpacked app
+        shell: pwsh
+        run: |
+          $zipName = "WMPF-Debugger-$env:GITHUB_REF_NAME-win-x64-unpacked.zip"
+          Compress-Archive -Path "release/win-unpacked/*" -DestinationPath "release/$zipName" -Force
+
+      - name: Create GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $assets = @()
+          $assets += Get-ChildItem release -Filter "*.exe" | ForEach-Object { $_.FullName }
+          $assets += Get-ChildItem release -Filter "*.blockmap" | ForEach-Object { $_.FullName }
+          $assets += Get-ChildItem release -Filter "*.zip" | ForEach-Object { $_.FullName }
+
+          gh release create $env:GITHUB_REF_NAME @assets `
+            --title "WMPF Debugger $env:GITHUB_REF_NAME" `
+            --generate-notes
