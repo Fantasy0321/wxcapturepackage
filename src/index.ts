@@ -26,17 +26,30 @@ const bufferToHexString = (buffer: ArrayBuffer) => {
     return Array.from(new Uint8Array(buffer)).map(byte => byte.toString(16).padStart(2, '0')).join("");
 }
 
-const listSupportedWmpfVersions = async (configDir: string) => {
+const parseOptionalNumber = (value: string | undefined) => {
+    if (value === undefined || value.trim() === "") {
+        return undefined;
+    }
+
+    const parsed = Number(value);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+const getProjectRoot = () => path.resolve(__dirname, "..");
+
+const getFridaConfigDir = () => path.join(getProjectRoot(), "frida/config");
+
+export const listSupportedWmpfVersions = async () => {
+    const configDir = getFridaConfigDir();
     try {
         const files = await promises.readdir(configDir);
-        const versions = files
+        return files
             .map(file => file.match(/^addresses\.(\d+)\.json$/)?.[1])
             .filter((version): version is string => version !== undefined)
             .map(Number)
             .sort((a, b) => a - b);
-        return versions.length > 0 ? versions.join(", ") : "none";
     } catch {
-        return "none";
+        return [];
     }
 }
 
@@ -181,7 +194,11 @@ export const proxy_server = (port: number = CDP_PORT) => {
     return wss;
 }
 
-export const frida_server = async () => {
+export interface FridaConfig {
+    wmpfVersion?: number;
+}
+
+export const frida_server = async (config?: FridaConfig) => {
     const localDevice = await frida.getLocalDevice();
     const processes = await localDevice.enumerateProcesses({scope: frida.Scope.Metadata});
     const wmpfProcesses = processes.filter(process => process.name === "WeChatAppEx.exe");
@@ -204,14 +221,15 @@ export const frida_server = async () => {
     }
     const pathStr = typeof wmpfProcess.parameters.path === 'string' ? wmpfProcess.parameters.path : "";
     const wmpfVersionMatch = pathStr.match(/\d+/g);
-    const wmpfVersion = wmpfVersionMatch ? Number(wmpfVersionMatch.pop()) : 0;
+    const detectedWmpfVersion = wmpfVersionMatch ? Number(wmpfVersionMatch.pop()) : 0;
+    const wmpfVersion = config?.wmpfVersion ?? detectedWmpfVersion;
     if (wmpfVersion === 0) {
         throw new Error("[frida] error in find wmpf version");
         return;
     }
 
-    const projectRoot = path.resolve(__dirname, "..");
-    const configDir = path.join(projectRoot, "frida/config");
+    const projectRoot = getProjectRoot();
+    const configDir = getFridaConfigDir();
 
     // find hook script
     let scriptContent: string | null = null;
@@ -227,7 +245,7 @@ export const frida_server = async () => {
         configContent = (await promises.readFile(path.join(configDir, `addresses.${wmpfVersion}.json`))).toString();
         configContent = JSON.stringify(JSON.parse(configContent));
     } catch(e) {
-        const supportedVersions = await listSupportedWmpfVersions(configDir);
+        const supportedVersions = await listSupportedWmpfVersions();
         throw new Error(`[frida] version config not found: ${wmpfVersion}. supported versions: ${supportedVersions}. process path: ${pathStr}`);
     }
 
@@ -245,28 +263,55 @@ export const frida_server = async () => {
         console.log("[frida client]", message);
     });
     await script.load();
-    console.log(`[frida] script loaded, WMPF version: ${wmpfVersion}, pid: ${wmpfPid}`);
+    const versionSource = config?.wmpfVersion === undefined ? "detected" : `configured, detected=${detectedWmpfVersion || "unknown"}`;
+    console.log(`[frida] script loaded, WMPF version: ${wmpfVersion} (${versionSource}), pid: ${wmpfPid}`);
 }
 
 export interface ServerConfig {
     debugPort?: number;
     cdpPort?: number;
+    wmpfVersion?: number;
 }
 
 export const main = async (config?: ServerConfig) => {
     debug_server(config?.debugPort ?? DEBUG_PORT);
     proxy_server(config?.cdpPort ?? CDP_PORT);
     try {
-        await frida_server();
+        await frida_server({ wmpfVersion: config?.wmpfVersion });
     } catch (e: any) {
         console.error("[frida]", e.message);
     }
+}
+
+const parseCliConfig = (): ServerConfig => {
+    const config: ServerConfig = {
+        debugPort: parseOptionalNumber(process.env.WMPF_DEBUG_PORT),
+        cdpPort: parseOptionalNumber(process.env.WMPF_CDP_PORT),
+        wmpfVersion: parseOptionalNumber(process.env.WMPF_VERSION),
+    };
+
+    for (const arg of process.argv.slice(2)) {
+        const [key, value] = arg.split("=", 2);
+        switch (key) {
+            case "--debug-port":
+                config.debugPort = parseOptionalNumber(value);
+                break;
+            case "--cdp-port":
+                config.cdpPort = parseOptionalNumber(value);
+                break;
+            case "--wmpf-version":
+                config.wmpfVersion = parseOptionalNumber(value);
+                break;
+        }
+    }
+
+    return config;
 }
 
 // When run as a script (not imported), auto-execute
 const isDirectRun = require.main === module || process.argv[1]?.endsWith("index.ts");
 if (isDirectRun) {
     (async () => {
-        await main();
+        await main(parseCliConfig());
     })();
 }

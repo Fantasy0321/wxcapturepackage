@@ -2,15 +2,18 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import path from "node:path";
 import { WebSocketServer } from "ws";
 import {
-  main as startServers,
   DEBUG_PORT,
   CDP_PORT,
-  ServerConfig,
 } from "../index";
 
 let mainWindow: BrowserWindow | null = null;
 let debugWss: WebSocketServer | null = null;
 let cdpWss: WebSocketServer | null = null;
+let currentPorts = {
+  debugPort: DEBUG_PORT,
+  cdpPort: CDP_PORT,
+};
+let currentWmpfVersion: number | undefined = undefined;
 
 const serverState = {
   debugServer: false,
@@ -40,6 +43,7 @@ function createWindow() {
       nodeIntegration: false,
     },
   });
+  mainWindow.setMenuBarVisibility(false);
 
   mainWindow.loadFile(path.join(__dirname, "renderer", "index.html"));
 
@@ -68,7 +72,7 @@ console.error = (...args: any[]) => {
   sendLog(`[error] ${msg}`);
 };
 
-async function startWithConfig(debugPort: number, cdpPort: number) {
+async function startWithConfig(debugPort: number, cdpPort: number, wmpfVersion?: number) {
   // Close existing servers first
   if (debugWss) {
     debugWss.close();
@@ -79,7 +83,10 @@ async function startWithConfig(debugPort: number, cdpPort: number) {
     cdpWss = null;
   }
 
-  sendLog(`[desktop] Starting servers... debug=${debugPort}, cdp=${cdpPort}`);
+  currentPorts = { debugPort, cdpPort };
+  currentWmpfVersion = wmpfVersion;
+
+  sendLog(`[desktop] Starting servers... debug=${debugPort}, cdp=${cdpPort}, wmpf=${wmpfVersion ?? "auto"}`);
 
   // We need to import and call debug_server/proxy_server directly to get instances.
   // Since they're not exported, we'll use the main function and monkey-patch.
@@ -93,7 +100,7 @@ async function startWithConfig(debugPort: number, cdpPort: number) {
 
   try {
     if (index.frida_server) {
-      await index.frida_server();
+      await index.frida_server({ wmpfVersion });
       serverState.frida = true;
       serverState.fridaError = "";
     }
@@ -127,11 +134,15 @@ app.on("activate", () => {
 // IPC handlers
 ipcMain.handle("get-state", () => serverState);
 ipcMain.handle("get-ports", () => ({
-  debugPort: DEBUG_PORT,
-  cdpPort: CDP_PORT,
+  ...currentPorts,
+  wmpfVersion: currentWmpfVersion,
 }));
+ipcMain.handle("get-supported-wmpf-versions", async () => {
+  const index = require("../index");
+  return index.listSupportedWmpfVersions?.() ?? [];
+});
 
-ipcMain.handle("restart-servers", async (_event, debugPort: number, cdpPort: number) => {
-  await startWithConfig(debugPort, cdpPort);
+ipcMain.handle("restart-servers", async (_event, debugPort: number, cdpPort: number, wmpfVersion?: number) => {
+  await startWithConfig(debugPort, cdpPort, wmpfVersion);
   return serverState;
 });

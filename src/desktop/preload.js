@@ -9,5 +9,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
   getState: () => ipcRenderer.invoke("get-state"),
   getPorts: () => ipcRenderer.invoke("get-ports"),
-  restartServers: (debugPort, cdpPort) => ipcRenderer.invoke("restart-servers", debugPort, cdpPort),
+  getSupportedWmpfVersions: () => ipcRenderer.invoke("get-supported-wmpf-versions"),
+  restartServers: (debugPort, cdpPort, wmpfVersion) => ipcRenderer.invoke("restart-servers", debugPort, cdpPort, wmpfVersion),
 });

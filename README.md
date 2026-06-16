@@ -6,6 +6,9 @@ Yet another WeChat miniapp debugger on Windows (WMPF).
 
 This debugger (tweak) exploits Remote Debug feature provided by wechatdevtools and patches serval restrictions to force miniapp runtime to support full Chrome Debug Protocol, and thus can be directly applied to standard devtools shipped with chromium-based browsers.
 
+**Core program author:** evi0s
+**Desktop integration author:** funny
+
 
 ## Support Status
 
@@ -13,7 +16,8 @@ Note: Currently only miniapp component is supported.
 
 Version histories:
 
-* 14199 (latest)
+* 25046 (latest)
+* 14199
 * 14161
 * 13909
 * 13871
@@ -56,10 +60,18 @@ cd WMPFDebugger
 yarn
 ```
 
-**Step 2.** Run `src/index.ts` to launch debug server and proxy server, and inject hook script to miniapp runtime.
+**Step 2.** Choose one of the following methods:
+
+**CLI mode** — Launch debug server and proxy server, and inject hook script to miniapp runtime.
 
 ```bash
-npx ts-node src/index.ts
+yarn start
+```
+
+**Desktop GUI mode** — Launch with a graphical interface featuring live status indicators, configurable ports, and log console.
+
+```bash
+yarn start:desktop
 ```
 
 > Note: After this step, you need to launch the miniapp BEFORE launching the devtools, otherwise you will probably need to kill the server and redo the steps 2 to 4 again.

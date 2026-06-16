@@ -125,7 +125,8 @@ header h1 {
   white-space: nowrap;
 }
 
-.config-group input {
+.config-group input,
+.config-group select {
   width: 68px;
   background: #12132a;
   border: 1px solid var(--border);
@@ -138,7 +139,12 @@ header h1 {
   transition: border 0.15s;
 }
 
-.config-group input:focus {
+.config-group select {
+  width: 118px;
+}
+
+.config-group input:focus,
+.config-group select:focus {
   border-color: var(--accent);
 }
 
@@ -295,6 +301,12 @@ header h1 {
     <label>CDP 端口:</label>
     <input type="number" id="inputCdpPort" value="62000" min="1024" max="65535">
   </div>
+  <div class="config-group">
+    <label>WMPF:</label>
+    <select id="selectWmpfVersion">
+      <option value="">自动检测</option>
+    </select>
+  </div>
   <button class="btn" id="btnApply">应用并重启</button>
 </div>
 
@@ -315,9 +327,11 @@ header h1 {
 const logContainer = document.getElementById('logContainer');
 const inputDebugPort = document.getElementById('inputDebugPort');
 const inputCdpPort = document.getElementById('inputCdpPort');
+const selectWmpfVersion = document.getElementById('selectWmpfVersion');
 const urlDisplay = document.getElementById('urlDisplay');
 const btnCopy = document.getElementById('btnCopy');
 const btnApply = document.getElementById('btnApply');
+let configuredWmpfVersion = '';
 
 const indicators = {
   debug: { el: document.getElementById('indicator-debug'), desc: document.getElementById('desc-debug') },
@@ -394,6 +408,7 @@ btnCopy.addEventListener('click', async () => {
 btnApply.addEventListener('click', async () => {
   const debugPort = parseInt(inputDebugPort.value) || 9421;
   const cdpPort = parseInt(inputCdpPort.value) || 62000;
+  const wmpfVersion = selectWmpfVersion.value ? parseInt(selectWmpfVersion.value, 10) : undefined;
   if (debugPort < 1024 || debugPort > 65535 || cdpPort < 1024 || cdpPort > 65535) {
     addLog('[error] 端口范围: 1024-65535');
     return;
@@ -402,7 +417,7 @@ btnApply.addEventListener('click', async () => {
   btnApply.textContent = '重启中...';
   btnApply.disabled = true;
   try {
-    const state = await window.electronAPI.restartServers(debugPort, cdpPort);
+    const state = await window.electronAPI.restartServers(debugPort, cdpPort, wmpfVersion);
     updateIndicators(state);
   } catch (e) {
     addLog(`[error] 重启失败: ${e.message}`);
@@ -433,8 +448,23 @@ window.electronAPI.getPorts().then((ports) => {
   if (ports) {
     inputDebugPort.value = ports.debugPort;
     inputCdpPort.value = ports.cdpPort;
+    configuredWmpfVersion = ports.wmpfVersion ? String(ports.wmpfVersion) : '';
+    selectWmpfVersion.value = configuredWmpfVersion;
     updateUrl(ports.cdpPort);
   }
+});
+window.electronAPI.getSupportedWmpfVersions().then((versions) => {
+  if (!Array.isArray(versions)) {
+    return;
+  }
+
+  for (const version of versions) {
+    const option = document.createElement('option');
+    option.value = String(version);
+    option.textContent = String(version);
+    selectWmpfVersion.appendChild(option);
+  }
+  selectWmpfVersion.value = configuredWmpfVersion;
 });
 </script>
 </body>
