@@ -10,6 +10,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getState: () => ipcRenderer.invoke("get-state"),
   getPorts: () => ipcRenderer.invoke("get-ports"),
   getSupportedWmpfVersions: () => ipcRenderer.invoke("get-supported-wmpf-versions"),
+  checkForUpdates: () => ipcRenderer.invoke("check-for-updates"),
+  openUpdateUrl: (url: string) => ipcRenderer.invoke("open-update-url", url),
   restartServers: (debugPort: number, cdpPort: number, wmpfVersion?: number) => {
     return ipcRenderer.invoke("restart-servers", debugPort, cdpPort, wmpfVersion);
   },
