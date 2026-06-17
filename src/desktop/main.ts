@@ -227,7 +227,6 @@ async function startWithConfig(debugPort: number, cdpPort: number, wmpfVersion?:
 
 app.whenReady().then(async () => {
   createWindow();
-  await startWithConfig(DEBUG_PORT, CDP_PORT);
 });
 
 app.on("window-all-closed", () => {

@@ -1,6 +1,6 @@
 {
   "name": "WMPFDebugger",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "main": "src/desktop/bootstrap.js",
   "license": "MIT",
   "author": "evi0s",

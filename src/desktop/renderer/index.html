@@ -341,6 +341,7 @@ header h1 {
       <option value="">自动检测</option>
     </select>
   </div>
+  <button class="btn" id="btnStart">Start</button>
   <button class="btn" id="btnApply">应用并重启</button>
 </div>
 
@@ -364,6 +365,7 @@ const inputCdpPort = document.getElementById('inputCdpPort');
 const selectWmpfVersion = document.getElementById('selectWmpfVersion');
 const urlDisplay = document.getElementById('urlDisplay');
 const btnCopy = document.getElementById('btnCopy');
+const btnStart = document.getElementById('btnStart');
 const btnApply = document.getElementById('btnApply');
 const btnCheckUpdate = document.getElementById('btnCheckUpdate');
 const updateBanner = document.getElementById('updateBanner');
@@ -372,6 +374,7 @@ const btnDownloadUpdate = document.getElementById('btnDownloadUpdate');
 const btnDismissUpdate = document.getElementById('btnDismissUpdate');
 let configuredWmpfVersion = '';
 let updateDownloadUrl = '';
+let serversStarted = false;
 
 const indicators = {
   debug: { el: document.getElementById('indicator-debug'), desc: document.getElementById('desc-debug') },
@@ -487,8 +490,7 @@ btnCopy.addEventListener('click', async () => {
   }
 });
 
-// Apply & restart
-btnApply.addEventListener('click', async () => {
+async function startServers(button) {
   const debugPort = parseInt(inputDebugPort.value) || 9421;
   const cdpPort = parseInt(inputCdpPort.value) || 62000;
   const wmpfVersion = selectWmpfVersion.value ? parseInt(selectWmpfVersion.value, 10) : undefined;
@@ -497,16 +499,35 @@ btnApply.addEventListener('click', async () => {
     return;
   }
   updateUrl(cdpPort);
-  btnApply.textContent = '重启中...';
+  const oldText = button.textContent;
+  button.textContent = serversStarted ? 'Restarting...' : 'Starting...';
+  btnStart.disabled = true;
   btnApply.disabled = true;
   try {
     const state = await window.electronAPI.restartServers(debugPort, cdpPort, wmpfVersion);
+    serversStarted = true;
+    btnStart.textContent = 'Restart';
     updateIndicators(state);
   } catch (e) {
     addLog(`[error] 重启失败: ${e.message}`);
   }
-  btnApply.textContent = '应用并重启';
+  button.textContent = button === btnStart && serversStarted ? 'Restart' : oldText;
+  btnStart.disabled = false;
   btnApply.disabled = false;
+}
+
+// Start / restart servers
+btnStart.addEventListener('click', () => {
+  startServers(btnStart);
+});
+
+// Apply & restart
+btnApply.addEventListener('click', async () => {
+  if (!serversStarted) {
+    addLog('[desktop] Click Start to run servers.');
+    return;
+  }
+  startServers(btnApply);
 });
 
 // Clear log
