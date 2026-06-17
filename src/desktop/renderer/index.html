@@ -83,6 +83,40 @@ header h1 {
   min-width: 0;
 }
 
+.update-progress {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  width: 180px;
+  flex-shrink: 0;
+}
+
+.update-progress.show {
+  display: flex;
+}
+
+.update-progress-track {
+  height: 6px;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.update-progress-bar {
+  width: 0%;
+  height: 100%;
+  background: var(--green);
+  transition: width 0.15s;
+}
+
+.update-progress-text {
+  width: 34px;
+  text-align: right;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
 .dashboard {
   display: flex;
   gap: 10px;
@@ -298,6 +332,12 @@ header h1 {
 
 <div class="update-banner" id="updateBanner">
   <span class="update-message" id="updateMessage"></span>
+  <div class="update-progress" id="updateProgress">
+    <div class="update-progress-track">
+      <div class="update-progress-bar" id="updateProgressBar"></div>
+    </div>
+    <span class="update-progress-text" id="updateProgressText">0%</span>
+  </div>
   <button class="btn" id="btnDownloadUpdate">Download</button>
   <button class="btn btn-outline" id="btnDismissUpdate">Later</button>
 </div>
@@ -370,10 +410,14 @@ const btnApply = document.getElementById('btnApply');
 const btnCheckUpdate = document.getElementById('btnCheckUpdate');
 const updateBanner = document.getElementById('updateBanner');
 const updateMessage = document.getElementById('updateMessage');
+const updateProgress = document.getElementById('updateProgress');
+const updateProgressBar = document.getElementById('updateProgressBar');
+const updateProgressText = document.getElementById('updateProgressText');
 const btnDownloadUpdate = document.getElementById('btnDownloadUpdate');
 const btnDismissUpdate = document.getElementById('btnDismissUpdate');
 let configuredWmpfVersion = '';
 let updateDownloadUrl = '';
+let updateDownloading = false;
 let serversStarted = false;
 
 const indicators = {
@@ -421,12 +465,56 @@ function showUpdateBanner(message, downloadUrl) {
   updateMessage.textContent = message;
   updateDownloadUrl = downloadUrl || '';
   btnDownloadUpdate.style.display = updateDownloadUrl ? '' : 'none';
+  updateProgress.classList.remove('show');
+  updateProgressBar.style.width = '0%';
+  updateProgressText.textContent = '0%';
   updateBanner.classList.add('show');
 }
 
 function hideUpdateBanner() {
+  if (updateDownloading) {
+    return;
+  }
   updateBanner.classList.remove('show');
   updateDownloadUrl = '';
+}
+
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return '0 B';
+  }
+
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${value >= 10 || unitIndex === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[unitIndex]}`;
+}
+
+function setDownloadProgress(progress) {
+  const percent = Math.max(0, Math.min(100, Math.round(progress.percent || 0)));
+  updateProgress.classList.add('show');
+  updateProgressBar.style.width = `${percent}%`;
+  updateProgressText.textContent = progress.total
+    ? `${percent}%`
+    : formatBytes(progress.transferred || 0);
+
+  if (progress.status === 'completed') {
+    updateDownloading = false;
+    btnDownloadUpdate.disabled = false;
+    btnDismissUpdate.disabled = false;
+    btnDownloadUpdate.textContent = 'Downloaded';
+    updateMessage.textContent = `Update downloaded: ${progress.filePath || ''}`;
+  } else if (progress.status === 'error') {
+    updateDownloading = false;
+    btnDownloadUpdate.disabled = false;
+    btnDismissUpdate.disabled = false;
+    btnDownloadUpdate.textContent = 'Download';
+    updateMessage.textContent = `Download failed: ${progress.error || 'Unknown error'}`;
+  }
 }
 
 async function checkForUpdates(manual) {
@@ -439,8 +527,11 @@ async function checkForUpdates(manual) {
     if (result.hasUpdate) {
       showUpdateBanner(
         `New version ${result.latestVersion} is available. Current version: ${result.currentVersion}.`,
-        result.downloadUrl || result.releaseUrl
+        result.downloadUrl
       );
+      if (!result.downloadUrl) {
+        updateMessage.textContent += ' No downloadable installer was found in this release.';
+      }
       addLog(`[desktop] New version available: ${result.latestVersion}`);
     } else if (manual) {
       const suffix = result.latestVersion ? ` Latest: ${result.latestVersion}.` : '';
@@ -540,14 +631,25 @@ btnCheckUpdate.addEventListener('click', () => {
 });
 
 btnDownloadUpdate.addEventListener('click', async () => {
-  if (!updateDownloadUrl) {
+  if (!updateDownloadUrl || updateDownloading) {
     return;
   }
 
   try {
-    await window.electronAPI.openUpdateUrl(updateDownloadUrl);
+    updateDownloading = true;
+    btnDownloadUpdate.disabled = true;
+    btnDismissUpdate.disabled = true;
+    btnDownloadUpdate.textContent = 'Downloading...';
+    updateMessage.textContent = 'Downloading update...';
+    setDownloadProgress({ status: 'downloading', transferred: 0, percent: 0 });
+    const result = await window.electronAPI.downloadUpdate(updateDownloadUrl);
+    addLog(`[desktop] Update downloaded: ${result.filePath}`);
   } catch (e) {
-    addLog(`[error] Open update URL failed: ${e.message}`);
+    updateDownloading = false;
+    btnDownloadUpdate.disabled = false;
+    btnDismissUpdate.disabled = false;
+    btnDownloadUpdate.textContent = 'Download';
+    addLog(`[error] Update download failed: ${e.message}`);
   }
 });
 
@@ -555,6 +657,7 @@ btnDismissUpdate.addEventListener('click', hideUpdateBanner);
 
 // Electron IPC
 window.electronAPI.onLog((msg) => addLog(msg));
+window.electronAPI.onUpdateDownloadProgress((progress) => setDownloadProgress(progress));
 window.electronAPI.onState((state) => {
   if (state) {
     updateIndicators(state);

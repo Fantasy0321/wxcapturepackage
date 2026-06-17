@@ -40,21 +40,12 @@ jobs:
       - name: Build installer
         run: yarn dist
 
-      - name: Package unpacked app
-        shell: pwsh
-        run: |
-          $zipName = "WMPF-Debugger-$env:RELEASE_TAG-win-x64-unpacked.zip"
-          Compress-Archive -Path "release/win-unpacked/*" -DestinationPath "release/$zipName" -Force
-
       - name: Upload GitHub release assets
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $assets = @()
-          $assets += Get-ChildItem release -Filter "*.exe" | ForEach-Object { $_.FullName }
-          $assets += Get-ChildItem release -Filter "*.blockmap" | ForEach-Object { $_.FullName }
-          $assets += Get-ChildItem release -Filter "*.zip" | ForEach-Object { $_.FullName }
+          $assets = Get-ChildItem release -Filter "*.exe" | ForEach-Object { $_.FullName }
 
           gh release view $env:RELEASE_TAG 2>$null
           if ($LASTEXITCODE -ne 0) {
